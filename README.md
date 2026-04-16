@@ -15,7 +15,7 @@ A self-hosted dashboard for tracking vulnerabilities, compliance, and scan histo
 ## 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url> prisma-cloud-reports
+git clone https://github.com/PCS-LAB-ORG/prisma_report_tool.git prisma-cloud-reports
 cd prisma-cloud-reports
 ```
 
