@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Host Report – Prisma Cloud</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+<style>
+.host-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-5); }
+
+.toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.search-box { flex: 1; min-width: 200px; position: relative; }
+.search-box input { width: 100%; padding: var(--space-2) var(--space-3) var(--space-2) 32px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: var(--text-sm); outline: none; }
+.search-box input:focus { border-color: var(--sky); }
+.search-box input::placeholder { color: var(--placeholder); }
+.search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); }
+
+.sev-pills { display: flex; gap: 4px; }
+
+/* Export dropdown */
+.export-wrap { position: relative; }
+.export-btn { display: flex; align-items: center; gap: 6px; }
+.export-menu { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xl); z-index: 50; min-width: 180px; padding: var(--space-2); display: none; }
+.export-menu.open { display: block; }
+.export-opt { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--text-sm); color: var(--text-2); transition: background var(--t-fast); }
+.export-opt:hover { background: var(--surface-2); color: var(--text); }
+.export-opt .eo-icon { width: 28px; height: 28px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
+.eo-csv .eo-icon { background: rgba(16,185,129,.12); color: var(--green); }
+.eo-html .eo-icon { background: rgba(14,165,233,.12); color: var(--sky); }
+.eo-pdf .eo-icon { background: rgba(239,68,68,.1); color: var(--red); }
+.export-opt .eo-label { font-weight: 600; font-size: var(--text-sm); }
+
+/* Status bar */
+.status-bar { display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) 0; font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--space-1); }
+.status-bar strong { color: var(--text); font-family: var(--mono); }
+
+/* Table */
+.h-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.h-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+.h-table th { position: sticky; top: 0; background: var(--surface-2); padding: var(--space-2) var(--space-3); text-align: left; font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; }
+.h-table th:hover { color: var(--text); }
+.h-table th .sort-arrow { margin-left: 4px; font-size: 8px; }
+.h-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-soft); color: var(--text-2); vertical-align: top; }
+.h-table tbody tr:hover td { background: var(--surface-2); }
+
+.cve-link { color: var(--sky); text-decoration: none; font-weight: 600; font-family: var(--mono); font-size: var(--text-sm); }
+.cve-link:hover { text-decoration: underline; }
+.desc-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-xs); }
+.cvss-cell { font-family: var(--mono); font-weight: 600; }
+.pkg-tag { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 1px 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; margin: 1px 2px 1px 0; white-space: nowrap; }
+.host-tag { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 1px 5px; background: var(--sky-light); color: var(--sky-dark); border-radius: 4px; margin: 1px 2px 1px 0; white-space: nowrap; }
+
+/* Pagination */
+.pager { display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); }
+.pager button { font-family: var(--font); font-size: var(--text-sm); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+.pager button:hover:not(:disabled) { border-color: var(--sky); color: var(--text); }
+.pager button:disabled { opacity: .4; cursor: not-allowed; }
+.pager .page-info { font-size: var(--text-xs); color: var(--muted); }
+
+/* OS breakdown mini chart */
+.os-bar { display: flex; gap: 1px; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.os-bar span { flex: 1; min-width: 4px; border-radius: 3px; }
+.os-legend { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: 4px; font-size: var(--text-xs); color: var(--muted); }
+.os-legend span { display: flex; align-items: center; gap: 4px; }
+.os-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--text-2); display: flex; align-items: center; gap: var(--space-2); box-shadow: var(--shadow-xl); z-index: 200; transform: translateY(100px); opacity: 0; transition: all var(--t-slow); pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.toast.success { border-color: var(--green); color: var(--green); }
+.toast.error { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+<nav class="s-nav">
+  <a href="/" class="nav-brand"><div class="nav-logo">&#9729;</div><span class="nav-name">Prisma Cloud</span></a>
+  <a href="/" class="nav-link">Dashboard</a>
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+
+<div class="s-main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Host Vulnerability Report</div>
+      <div class="page-subtitle" id="subtitle">Loading&hellip;</div>
+    </div>
+    <div class="export-wrap">
+      <button class="btn btn-primary export-btn" onclick="toggleExport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export <span class="caret" style="font-size:8px">&#9662;</span>
+      </button>
+      <div class="export-menu" id="export-menu">
+        <div class="export-opt eo-csv" onclick="doExport('csv')"><div class="eo-icon">CSV</div><span class="eo-label">Download CSV</span></div>
+        <div class="export-opt eo-html" onclick="doExport('html')"><div class="eo-icon">HTML</div><span class="eo-label">Download HTML</span></div>
+        <div class="export-opt eo-pdf" onclick="doExport('pdf')"><div class="eo-icon">PDF</div><span class="eo-label">Download PDF</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="host-kpis" id="kpi-row"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="search" placeholder="Search CVE ID or description&hellip;" oninput="debounceLoad()">
+    </div>
+    <div class="sev-pills" id="sev-pills"></div>
+  </div>
+
+  <div class="status-bar" id="status-bar"></div>
+
+  <!-- Table -->
+  <div class="h-table-wrap">
+    <table class="h-table">
+      <thead id="thead"><tr>
+        <th data-col="cve_id">CVE ID</th>
+        <th data-col="severity">Severity</th>
+        <th data-col="cvss">CVSS</th>
+        <th>Description</th>
+        <th data-col="fix_status">Fix Status</th>
+        <th>KEV</th>
+        <th>Hosts</th>
+        <th>Packages</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="pager" id="pager"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="tenant.js"></script>
+<script>
+const F = () => window.TenantCtx ? TenantCtx.apiFetch : fetch;
+const SEV_COLORS = { critical: 'var(--sev-critical)', high: 'var(--sev-high)', medium: 'var(--sev-medium)', low: 'var(--sev-low)' };
+const SEV_ORDER = ['critical','high','medium','low'];
+const OS_COLORS = ['var(--sky)','var(--green)','var(--amber)','var(--red)','var(--sev-high)','#a78bfa','#f472b6'];
+let currentPage = 1, pageSize = 50, sortBy = 'cvss', sortDir = 'DESC', activeSev = [], searchTimer = null;
+
+function num(n) { return (n||0).toLocaleString(); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+document.addEventListener('DOMContentLoaded', () => { loadData(); initSort(); });
+
+function initSort() {
+  document.querySelectorAll('#thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortBy === col) sortDir = sortDir === 'DESC' ? 'ASC' : 'DESC';
+      else { sortBy = col; sortDir = 'DESC'; }
+      currentPage = 1;
+      loadData();
+    });
+  });
+}
+
+async function loadData() {
+  const f = F();
+  const params = new URLSearchParams({ page: currentPage, pageSize, sort_by: sortBy, sort_dir: sortDir });
+  const q = document.getElementById('search').value.trim();
+  if (q) params.set('q', q);
+  if (activeSev.length) params.set('severity', activeSev.join(','));
+
+  try {
+    const res = await f('/api/hosts?' + params);
+    const data = await res.json();
+    renderKpis(data.summary || {});
+    renderSevPills(data.summary?.severity || {});
+    renderStatus(data);
+    renderTable(data.rows || []);
+    renderPager(data);
+    document.getElementById('subtitle').textContent = num(data.summary?.total_hosts || 0) + ' hosts \u00b7 ' + num(data.summary?.total_cves || 0) + ' CVEs \u00b7 ' + num(data.summary?.kev || 0) + ' KEV';
+  } catch (e) {
+    document.getElementById('subtitle').textContent = 'Error loading data';
+  }
+}
+
+function debounceLoad() { clearTimeout(searchTimer); searchTimer = setTimeout(() => { currentPage = 1; loadData(); }, 300); }
+
+function renderKpis(s) {
+  const el = document.getElementById('kpi-row');
+  const sev = s.severity || {};
+  let osHtml = '';
+  if (s.os_breakdown && Object.keys(s.os_breakdown).length) {
+    const entries = Object.entries(s.os_breakdown).sort((a,b) => b[1] - a[1]);
+    const total = entries.reduce((a, b) => a + b[1], 0);
+    osHtml = '<div class="os-bar">' + entries.map((e, i) => '<span style="flex:' + e[1] + ';background:' + OS_COLORS[i % OS_COLORS.length] + '"></span>').join('') + '</div>'
+      + '<div class="os-legend">' + entries.map((e, i) => '<span><span class="os-dot" style="background:' + OS_COLORS[i % OS_COLORS.length] + '"></span>' + esc(e[0]) + ' (' + e[1] + ')</span>').join('') + '</div>';
+  }
+
+  el.innerHTML = ''
+    + '<div class="kpi-card sky"><div class="kpi-label">Total Hosts</div><div class="kpi-number">' + num(s.total_hosts) + '</div>' + osHtml + '</div>'
+    + '<div class="kpi-card red"><div class="kpi-label">Critical</div><div class="kpi-number">' + num(sev.critical) + '</div></div>'
+    + '<div class="kpi-card" style="border-left-color:var(--sev-high)"><div class="kpi-label">High</div><div class="kpi-number">' + num(sev.high) + '</div></div>'
+    + '<div class="kpi-card amber"><div class="kpi-label">Medium</div><div class="kpi-number">' + num(sev.medium) + '</div></div>'
+    + '<div class="kpi-card green"><div class="kpi-label">Low</div><div class="kpi-number">' + num(sev.low) + '</div></div>'
+    + '<div class="kpi-card" style="border-left-color:#a78bfa"><div class="kpi-label">KEV</div><div class="kpi-number">' + num(s.kev) + '</div></div>';
+}
+
+function renderSevPills(sev) {
+  const el = document.getElementById('sev-pills');
+  el.innerHTML = SEV_ORDER.map(s => {
+    const active = activeSev.includes(s);
+    return '<button class="pill' + (active ? ' active' : '') + '" data-sev="' + s + '" onclick="toggleSev(\'' + s + '\')" style="' + (active ? 'background:' + SEV_COLORS[s] + '20;color:' + SEV_COLORS[s] + ';border-color:' + SEV_COLORS[s] + '40' : '') + '">' + s.charAt(0).toUpperCase() + s.slice(1) + ' (' + num(sev[s]) + ')</button>';
+  }).join('');
+}
+
+function toggleSev(s) {
+  const i = activeSev.indexOf(s);
+  if (i >= 0) activeSev.splice(i, 1); else activeSev.push(s);
+  currentPage = 1;
+  loadData();
+}
+
+function renderStatus(data) {
+  const el = document.getElementById('status-bar');
+  const start = ((data.page - 1) * data.pageSize) + 1;
+  const end = Math.min(data.page * data.pageSize, data.total);
+  el.innerHTML = data.total ? 'Showing <strong>' + start + '\u2013' + end + '</strong> of <strong>' + num(data.total) + '</strong> host CVEs' : '<span>No host vulnerabilities found</span>';
+}
+
+function renderTable(rows) {
+  const tb = document.getElementById('tbody');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:var(--space-6);color:var(--muted)">No host vulnerabilities found</td></tr>'; return; }
+
+  document.querySelectorAll('#thead th[data-col]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow') || (() => { const sp = document.createElement('span'); sp.className = 'sort-arrow'; th.appendChild(sp); return sp; })();
+    if (th.dataset.col === sortBy) arrow.textContent = sortDir === 'ASC' ? '\u25B2' : '\u25BC';
+    else arrow.textContent = '';
+  });
+
+  tb.innerHTML = rows.map(r => {
+    const sevColor = SEV_COLORS[r.severity] || 'var(--muted)';
+    const hosts = r.resources && r.resources.host ? r.resources.host.map(h => '<span class="host-tag">' + esc(h.name) + '</span>').join(' ') : '';
+    const pkgs = r.packages ? Object.keys(r.packages).slice(0, 5).map(p => '<span class="pkg-tag">' + esc(p) + '</span>').join(' ') + (Object.keys(r.packages).length > 5 ? '<span class="pkg-tag">+' + (Object.keys(r.packages).length - 5) + '</span>' : '') : '';
+    return '<tr>'
+      + '<td><a class="cve-link" href="https://nvd.nist.gov/vuln/detail/' + esc(r.cve_id) + '" target="_blank">' + esc(r.cve_id) + '</a></td>'
+      + '<td><span class="badge" style="background:' + sevColor + '20;color:' + sevColor + '">' + esc(r.severity) + '</span></td>'
+      + '<td class="cvss-cell">' + (r.cvss || 0).toFixed(1) + '</td>'
+      + '<td class="desc-cell" title="' + esc(r.description || '') + '">' + esc(r.description || '') + '</td>'
+      + '<td><span class="badge badge-gray">' + esc(r.fix_status || 'unknown') + '</span></td>'
+      + '<td>' + (r.is_kev ? '<span class="badge badge-red">KEV</span>' : '') + '</td>'
+      + '<td>' + hosts + '</td>'
+      + '<td>' + pkgs + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function renderPager(data) {
+  const el = document.getElementById('pager');
+  const totalPages = Math.ceil(data.total / data.pageSize) || 1;
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = '<button ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">\u2190 Prev</button>'
+    + '<span class="page-info">Page ' + currentPage + ' of ' + totalPages + '</span>'
+    + '<button ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">Next \u2192</button>';
+}
+
+function goPage(p) { currentPage = p; loadData(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+// ── Export ──
+
+function toggleExport() {
+  const m = document.getElementById('export-menu');
+  m.classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.export-wrap')) document.getElementById('export-menu').classList.remove('open');
+});
+
+async function doExport(format) {
+  document.getElementById('export-menu').classList.remove('open');
+  showToast('Generating ' + format.toUpperCase() + '&hellip;', '');
+  const f = F();
+  try {
+    const body = { format };
+    if (activeSev.length) body.severity = activeSev;
+    const q = document.getElementById('search').value.trim();
+    if (q) body.q = q;
+    const res = await f('/api/hosts/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await res.json();
+    if (d.ok && d.file) {
+      const tenant = d.tenant || (window.TenantCtx ? TenantCtx.getCurrentTenant() : 'default');
+      const url = '/api/reports/file/' + d.file + '?tenant=' + encodeURIComponent(tenant);
+      const a = document.createElement('a'); a.href = url; a.download = d.file; document.body.appendChild(a); a.click(); a.remove();
+      showToast(format.toUpperCase() + ' exported \u2014 ' + num(d.count) + ' CVEs', 'success');
+    } else {
+      showToast(d.error || 'Export failed', 'error');
+    }
+  } catch (e) { showToast('Export error: ' + e.message, 'error'); }
+}
+
+function showToast(msg, cls) {
+  const el = document.getElementById('toast');
+  el.innerHTML = msg;
+  el.className = 'toast show' + (cls ? ' ' + cls : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = 'toast'; }, 4000);
+}
+</script>
+</body>
+</html>

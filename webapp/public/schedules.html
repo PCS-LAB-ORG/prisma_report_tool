@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedules — Prisma Cloud</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="s-nav">
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">☁</div>
+    <span class="nav-name">Prisma Cloud</span>
+  </a>
+  <a href="/" class="nav-link">Dashboard</a>
+
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link active">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+
+<div class="s-main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Scheduled Reports</div>
+      <div class="page-subtitle">Automate recurring report generation and email delivery</div>
+    </div>
+    <button class="btn btn-primary" onclick="showAddForm()">+ New Schedule</button>
+  </div>
+
+  <!-- Add/Edit Form (hidden by default) -->
+  <div class="card" id="schedule-form" style="display:none;margin-bottom:var(--space-4)">
+    <div class="card-head">
+      <span class="card-title" id="form-title">New Schedule</span>
+      <button class="btn btn-ghost sm" onclick="hideForm()">✕ Close</button>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+        <div>
+          <label class="form-label" for="sched-name">Schedule Name</label>
+          <input class="input" id="sched-name" placeholder="e.g. Daily Critical Report">
+        </div>
+        <div>
+          <label class="form-label" for="sched-template">Template</label>
+          <select class="select" id="sched-template" style="width:100%"></select>
+        </div>
+        <div>
+          <label class="form-label" for="sched-cron">Cron Expression</label>
+          <input class="input" id="sched-cron" placeholder="0 8 * * 1-5" style="font-family:var(--mono)">
+          <div class="text-xs" style="margin-top:4px">e.g. <code>0 8 * * 1-5</code> = weekdays at 8am</div>
+        </div>
+        <div>
+          <label class="form-label" for="sched-format">Format</label>
+          <select class="select" id="sched-format" style="width:100%">
+            <option value="pdf">PDF</option>
+            <option value="html">HTML</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+        <div style="grid-column:span 2">
+          <label class="form-label" for="sched-email">Email To (optional)</label>
+          <input class="input" id="sched-email" placeholder="user@example.com">
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--space-2);margin-top:var(--space-4)">
+        <button class="btn btn-primary" id="btn-save-sched" onclick="saveSchedule()">Save Schedule</button>
+        <button class="btn btn-ghost" onclick="hideForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedules Table -->
+  <div class="card" style="margin-bottom:var(--space-4)">
+    <div class="card-head">
+      <span class="card-title">Active Schedules</span>
+    </div>
+    <div class="table-wrap">
+      <table class="s-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Template</th>
+            <th>Schedule</th>
+            <th>Format</th>
+            <th>Email</th>
+            <th>Last Run</th>
+            <th>Status</th>
+            <th class="right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="schedules-body">
+          <tr class="empty-row"><td colspan="8">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Report History -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Report History</span>
+    </div>
+    <div class="table-wrap">
+      <table class="s-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Format</th>
+            <th>Created</th>
+            <th class="right">Download</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr class="empty-row"><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="tenant.js"></script>
+<script src="schedules.js"></script>
+</body>
+</html>

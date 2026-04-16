@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prisma Cloud Vulnerability Report</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+<style>
+.export-wrap { position: relative; }
+.btn-export { display: flex; align-items: center; gap: 6px; padding: var(--space-2) var(--space-3); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); font-weight: 600; font-size: var(--text-sm); cursor: pointer; white-space: nowrap; }
+.btn-export:hover { border-color: var(--sky); }
+.export-menu { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xl); z-index: 50; min-width: 180px; padding: var(--space-2); display: none; }
+.export-menu.open { display: block; }
+.export-opt { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--text-sm); color: var(--text-2); transition: background var(--t-fast); }
+.export-opt:hover { background: var(--surface-2); color: var(--text); }
+.eo-icon { width: 28px; height: 28px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
+.eo-csv .eo-icon { background: rgba(16,185,129,.12); color: var(--green); }
+.eo-html .eo-icon { background: rgba(14,165,233,.12); color: var(--sky); }
+.eo-pdf .eo-icon { background: rgba(239,68,68,.1); color: var(--red); }
+.eo-label { font-weight: 600; font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<nav class="s-nav">
+  <a href="/" class="nav-brand"><div class="nav-logo">☁</div><span class="nav-name">Prisma Cloud</span></a>
+  <a href="/" class="nav-link active">Dashboard</a>
+
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-box">
+    <div class="splash-brand">
+      <div class="splash-logo">☁</div>
+      <div class="splash-title">Prisma Cloud</div>
+      <div class="splash-subtitle">Vulnerability Intelligence Platform</div>
+    </div>
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Initializing&hellip;</div>
+  </div>
+</div>
+<div class="s-main">
+  <!-- Tile dashboard (default view) -->
+  <div id="view-tiles">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Report Templates</div>
+        <div class="page-subtitle" id="header-subtitle">Loading&hellip;</div>
+      </div>
+      <div class="filter-actions">
+        <a href="/wizard.html" class="btn btn-primary sm" style="text-decoration:none">+ Custom Report</a>
+      </div>
+    </div>
+    <div id="template-tiles" class="tile-grid"></div>
+  </div>
+
+  <!-- Top 10 report (shown when tile clicked) -->
+  <div id="view-top10" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Top 10 Vulnerabilities</div>
+        <div class="page-subtitle" id="top10-subtitle"></div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-secondary sm" onclick="showTiles()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <div id="top10-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label for="os-filter">OS</label>
+          <select class="select" id="os-filter" onchange="loadTop10()"><option value="" selected>All Operating Systems</option></select>
+          <label for="rf-filter">Risk Factor</label>
+          <select class="select" id="rf-filter" onchange="loadTop10()"><option value="" selected>All Risk Factors</option></select>
+        </div>
+        <div class="export-wrap">
+          <button class="btn-export" onclick="toggleTop10Export(event)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export &#9662;
+          </button>
+          <div class="export-menu" id="top10-export-menu">
+            <div class="export-opt eo-csv" onclick="exportTop10('csv')"><div class="eo-icon">CSV</div><span class="eo-label">CSV Spreadsheet</span></div>
+            <div class="export-opt eo-html" onclick="exportTop10('html')"><div class="eo-icon">HTML</div><span class="eo-label">HTML Report</span></div>
+            <div class="export-opt eo-pdf" onclick="exportTop10('pdf')"><div class="eo-icon">PDF</div><span class="eo-label">PDF Document</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-5" id="top10-summary" style="margin-bottom:var(--space-5)"></div>
+    <div id="top10-sections"></div>
+  </div>
+
+  <!-- KEV report (shown when tile clicked) -->
+  <div id="view-kev" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">KEV Report</div>
+        <div class="page-subtitle" id="kev-subtitle"></div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-secondary sm" onclick="showTiles()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <div id="kev-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label for="col-filter">Collection</label>
+          <select class="select" id="col-filter" onchange="loadKev()"><option value="" selected>All Collections</option></select>
+          <label for="repo-filter">Repository</label>
+          <select class="select" id="repo-filter" onchange="loadKev()"><option value="" selected>All Repositories</option></select>
+        </div>
+        <div class="export-wrap">
+          <button class="btn-export" onclick="toggleKevExport(event)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export &#9662;
+          </button>
+          <div class="export-menu" id="kev-export-menu">
+            <div class="export-opt eo-csv" onclick="exportKev('csv')"><div class="eo-icon">CSV</div><span class="eo-label">CSV Spreadsheet</span></div>
+            <div class="export-opt eo-html" onclick="exportKev('html')"><div class="eo-icon">HTML</div><span class="eo-label">HTML Report</span></div>
+            <div class="export-opt eo-pdf" onclick="exportKev('pdf')"><div class="eo-icon">PDF</div><span class="eo-label">PDF Document</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-5" id="kev-summary" style="margin-bottom:var(--space-5)"></div>
+    <div id="kev-sections"></div>
+  </div>
+
+  <p class="app-footer">Source: Prisma Cloud CWP API (v34.03)</p>
+</div>
+<script src="tenant.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

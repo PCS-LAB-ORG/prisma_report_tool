@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    container_name: prisma-cloud-reports
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./webapp/generated_reports:/app/webapp/generated_reports
+      - ~/.prismacloud/credentials.json:/root/.prismacloud/credentials.json:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped

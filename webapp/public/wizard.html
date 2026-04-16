@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Wizard — Prisma Cloud</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+<style>
+.wizard-steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:var(--space-6);padding:var(--space-4) 0}
+.wz-step{display:flex;align-items:center;gap:var(--space-2);cursor:pointer;opacity:.45;transition:opacity var(--t-base)}
+.wz-step.active,.wz-step.done{opacity:1}
+.wz-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);font-weight:700;border:2px solid var(--border);color:var(--muted);background:var(--surface);transition:all var(--t-base)}
+.wz-step.active .wz-num{border-color:var(--sky);background:var(--sky);color:white}
+.wz-step.done .wz-num{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
+.wz-label{font-size:var(--text-sm);font-weight:600;color:var(--muted)}
+.wz-step.active .wz-label{color:var(--text)}
+.wz-line{width:40px;height:2px;background:var(--border);margin:0 var(--space-2)}
+.wz-line.done{background:var(--green)}
+.step-panel{display:none}
+.step-panel.active{display:block}
+.source-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)}
+.source-card{padding:var(--space-6);border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:center;transition:all var(--t-base);background:var(--surface)}
+.source-card:hover{border-color:var(--sky-border);background:var(--sky-light)}
+.source-card.selected{border-color:var(--sky);background:var(--sky-light)}
+.source-card h3{font-size:var(--text-xl);font-weight:700;margin-bottom:var(--space-1)}
+.source-card p{font-size:var(--text-sm);color:var(--muted)}
+.source-icon{font-size:28px;margin-bottom:var(--space-2)}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)}
+@media(max-width:700px){.filter-grid,.source-grid{grid-template-columns:1fr}}
+.check-group{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.check-group label{display:flex;align-items:center;gap:4px;font-size:var(--text-base);cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-xl);transition:all var(--t-base)}
+.check-group label:has(input:checked){background:var(--sky-light);border-color:var(--sky-border);color:var(--sky-dark)}
+.check-group input[type="checkbox"]{display:none}
+.col-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
+@media(max-width:700px){.col-grid{grid-template-columns:1fr 1fr}}
+.col-option{display:flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:var(--text-base);transition:all var(--t-base)}
+.col-option:has(input:checked){background:var(--sky-light);border-color:var(--sky-border)}
+.col-option input[type="checkbox"]{accent-color:var(--sky)}
+.wz-actions{display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<nav class="s-nav">
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">☁</div>
+    <span class="nav-name">Prisma Cloud</span>
+  </a>
+  <a href="/" class="nav-link">Dashboard</a>
+
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+
+<div class="s-main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Report Wizard</div>
+      <div class="page-subtitle">Build a custom vulnerability report in 5 steps</div>
+    </div>
+  </div>
+
+  <div class="wizard-steps" id="step-bar">
+    <div class="wz-step active" data-step="1" onclick="goStep(1)"><div class="wz-num">1</div><span class="wz-label">Source</span></div>
+    <div class="wz-line" id="wz-line-1"></div>
+    <div class="wz-step" data-step="2" onclick="goStep(2)"><div class="wz-num">2</div><span class="wz-label">Filters</span></div>
+    <div class="wz-line" id="wz-line-2"></div>
+    <div class="wz-step" data-step="3" onclick="goStep(3)"><div class="wz-num">3</div><span class="wz-label">Columns</span></div>
+    <div class="wz-line" id="wz-line-3"></div>
+    <div class="wz-step" data-step="4" onclick="goStep(4)"><div class="wz-num">4</div><span class="wz-label">Preview</span></div>
+    <div class="wz-line" id="wz-line-4"></div>
+    <div class="wz-step" data-step="5" onclick="goStep(5)"><div class="wz-num">5</div><span class="wz-label">Save</span></div>
+  </div>
+
+  <!-- Step 1: Data Source -->
+  <div class="step-panel active" id="step-1">
+    <div class="source-grid">
+      <div class="source-card selected" id="src-all" onclick="pickSource('all')">
+        <div class="source-icon">🔍</div>
+        <h3>All Vulnerabilities</h3>
+        <p>Query across all CVEs from images, registry, and hosts</p>
+      </div>
+      <div class="source-card" id="src-kev" onclick="pickSource('kev')">
+        <div class="source-icon">⚠️</div>
+        <h3>KEV Only</h3>
+        <p>Known Exploited Vulnerabilities — the highest priority</p>
+      </div>
+    </div>
+    <div class="wz-actions"><div></div><button class="btn btn-primary" onclick="goStep(2)">Next →</button></div>
+  </div>
+
+  <!-- Step 2: Filters -->
+  <div class="step-panel" id="step-2">
+    <div class="filter-grid">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Severity</span></div>
+        <div class="card-body">
+          <div class="check-group" id="sev-checks">
+            <label><input type="checkbox" value="critical" checked> Critical</label>
+            <label><input type="checkbox" value="high" checked> High</label>
+            <label><input type="checkbox" value="medium" checked> Medium</label>
+            <label><input type="checkbox" value="low"> Low</label>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Operating System</span></div>
+        <div class="card-body"><div class="check-group" id="os-checks"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Risk Factor</span></div>
+        <div class="card-body"><div class="check-group" id="rf-checks"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Collection</span></div>
+        <div class="card-body"><div class="check-group" id="col-checks"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Resource Type</span></div>
+        <div class="card-body"><div class="check-group" id="rt-checks"></div></div>
+      </div>
+    </div>
+    <div class="wz-actions">
+      <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goStep(3)">Next →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Columns & Layout -->
+  <div class="step-panel" id="step-3">
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div class="card-head"><span class="card-title">Select Columns</span></div>
+      <div class="card-body">
+        <div class="col-grid" id="col-checks-grid"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Sort & Limit</span></div>
+      <div class="card-body" style="display:flex;gap:var(--space-4);flex-wrap:wrap;align-items:flex-end">
+        <div>
+          <label class="form-label" for="sort-by">Sort By</label>
+          <select class="select" id="sort-by">
+            <option value="cvss">CVSS Score</option>
+            <option value="severity">Severity</option>
+            <option value="cve_id">CVE ID</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="sort-dir">Direction</label>
+          <select class="select" id="sort-dir">
+            <option value="DESC">Descending</option>
+            <option value="ASC">Ascending</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="row-limit">Limit</label>
+          <input class="input" type="number" id="row-limit" value="100" min="1" max="5000" style="width:100px">
+        </div>
+      </div>
+    </div>
+    <div class="wz-actions">
+      <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goStep(4)">Preview →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Preview -->
+  <div class="step-panel" id="step-4">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Preview</span>
+        <span class="badge badge-sky" id="preview-count">—</span>
+      </div>
+      <div class="table-wrap">
+        <table class="s-table" id="preview-table">
+          <thead><tr id="preview-head"></tr></thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="wz-actions">
+      <button class="btn btn-ghost" onclick="goStep(3)">← Back</button>
+      <button class="btn btn-primary" onclick="goStep(5)">Save & Deliver →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Save & Deliver -->
+  <div class="step-panel" id="step-5">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Report Details</span></div>
+        <div class="card-body">
+          <div style="margin-bottom:var(--space-3)">
+            <label class="form-label" for="report-name">Report Name</label>
+            <input class="input" id="report-name" placeholder="e.g. Weekly Critical CVEs">
+          </div>
+          <div style="margin-bottom:var(--space-3)">
+            <label class="form-label" for="report-format">Format</label>
+            <select class="select" id="report-format" style="width:100%">
+              <option value="pdf">PDF</option>
+              <option value="html">HTML</option>
+              <option value="csv">CSV</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="report-email">Email To (optional)</label>
+            <input class="input" id="report-email" placeholder="user@example.com">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Actions</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <button class="btn btn-primary lg" onclick="generateNow()" id="btn-generate">Generate Report Now</button>
+          <button class="btn btn-secondary lg" onclick="saveTemplate()">Save as Template</button>
+          <div id="generate-result" style="margin-top:var(--space-2)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="wz-actions">
+      <button class="btn btn-ghost" onclick="goStep(4)">← Back</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="loading-box">
+    <div class="splash-brand">
+      <div class="splash-logo">☁</div>
+      <div class="splash-title">Prisma Cloud</div>
+      <div class="splash-subtitle">Report Generator</div>
+    </div>
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Generating report…</div>
+  </div>
+</div>
+
+<script src="tenant.js"></script>
+<script src="wizard.js"></script>
+</body>
+</html>

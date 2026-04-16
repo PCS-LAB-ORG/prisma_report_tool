@@ -1,0 +1,10 @@
+webapp/generated_reports/
+*.db
+*.db-shm
+*.db-wal
+__pycache__/*
+node_modules/*
+webapp/node_modules/*
+data/*
+env/*
+

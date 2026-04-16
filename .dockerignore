@@ -1,0 +1,15 @@
+node_modules
+webapp/node_modules
+webapp/generated_reports
+*.db
+*.db-journal
+.git
+__pycache__
+*.pyc
+venv
+.env
+.env.*
+.idea
+.vscode
+.harness
+data/

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Executive Summary – Prisma Cloud</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+<style>
+.exec-header { margin-bottom: var(--space-5); }
+.exec-meta { font-size: var(--text-sm); color: var(--muted); margin-top: var(--space-1); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-5); }
+.kpi-card { padding: var(--space-4); border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }
+.kpi-value { font-size: var(--text-2xl); font-weight: 800; font-family: var(--font-mono); }
+.kpi-label { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+.kpi-delta { font-size: var(--text-xs); font-weight: 600; margin-top: 4px; }
+.delta-up { color: var(--red); }
+.delta-down { color: var(--green); }
+.delta-flat { color: var(--muted); }
+
+.exec-section { margin-bottom: var(--space-6); }
+.exec-section-title { font-size: var(--text-lg); font-weight: 800; margin-bottom: var(--space-3); padding-bottom: var(--space-2); border-bottom: 2px solid var(--border); }
+
+.chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); }
+.chart-title { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-3); color: var(--text-2); }
+
+.delta-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.delta-table th { text-align: left; padding: var(--space-2) var(--space-3); font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid var(--border); background: var(--surface-2); }
+.delta-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-soft); color: var(--text-2); }
+.delta-table .mono { font-family: var(--font-mono); }
+
+.narrative-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); }
+.narrative-block p { margin: 0 0 var(--space-3) 0; line-height: 1.7; font-size: var(--text-sm); color: var(--text-2); }
+.narrative-block p:last-child { margin-bottom: 0; }
+
+.export-bar { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+.btn-export { padding: var(--space-2) var(--space-4); background: var(--sky); color: #fff; border: none; border-radius: var(--radius); font-weight: 700; font-size: var(--text-sm); cursor: pointer; transition: background var(--t-base); }
+.btn-export:hover { background: var(--sky-dark); }
+.btn-export-sec { padding: var(--space-2) var(--space-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); font-weight: 600; font-size: var(--text-sm); cursor: pointer; }
+.btn-export-sec:hover { border-color: var(--sky); }
+
+svg text { font-family: var(--font-mono); }
+.scan-select { padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: var(--text-sm); outline: none; min-width: 220px; }
+.scan-select:focus { border-color: var(--sky); }
+.btn-compare { padding: var(--space-2) var(--space-4); background: var(--sky); color: #fff; border: none; border-radius: var(--radius); font-weight: 700; font-size: var(--text-sm); cursor: pointer; transition: background var(--t-base); }
+.btn-compare:hover { background: var(--sky-dark); }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav class="s-nav">
+  <a href="/" class="nav-brand"><div class="nav-logo">☁</div><span class="nav-name">Prisma Cloud</span></a>
+  <a href="/" class="nav-link">Dashboard</a>
+
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+
+<div class="s-main">
+  <div class="exec-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title">Executive Summary</h1>
+        <p id="exec-meta" class="exec-meta"></p>
+      </div>
+      <div class="export-bar" style="margin-bottom:0">
+        <button class="btn-export" onclick="doExport('pdf')">PDF</button>
+        <button class="btn-export-sec" onclick="doExport('html')">HTML</button>
+        <button class="btn-export-sec" onclick="doExport('csv')">CSV</button>
+      </div>
+    </div>
+    <div class="exec-toolbar" style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-3)">
+      <label style="font-size:var(--text-sm);color:var(--text-2)">Base Scan</label>
+      <select id="exec-scan-a" class="scan-select"></select>
+      <span style="color:var(--muted);font-size:18px;font-weight:700">→</span>
+      <label style="font-size:var(--text-sm);color:var(--text-2)">Compare Scan</label>
+      <select id="exec-scan-b" class="scan-select"></select>
+      <button class="btn-compare" onclick="applyScans()">Apply</button>
+    </div>
+  </div>
+
+  <div id="loading" style="text-align:center;padding:var(--space-6)"><div class="spinner" style="margin:0 auto"></div></div>
+
+  <div id="exec-body" style="display:none">
+    <div id="kpi-row" class="kpi-row"></div>
+
+    <div class="exec-section">
+      <div class="exec-section-title">Assets Summary</div>
+      <div id="delta-table-wrap"></div>
+    </div>
+
+    <div class="exec-section">
+      <div class="chart-grid">
+        <div class="chart-wrap">
+          <div class="chart-title">Vulnerabilities by Severity</div>
+          <div id="sev-bar-chart"></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">Severity Trend (Previous → Current)</div>
+          <div id="sev-trend-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="exec-section">
+      <div class="exec-section-title">Analysis</div>
+      <div id="narrative" class="narrative-block"></div>
+    </div>
+  </div>
+</div>
+
+<script src="tenant.js"></script>
+<script src="executive.js"></script>
+</body>
+</html>

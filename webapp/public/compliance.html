@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compliance – Prisma Cloud</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="style.css">
+<style>
+.comp-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.comp-toolbar .select { min-width: 160px; }
+.comp-search { padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: var(--text-sm); outline: none; min-width: 240px; }
+.comp-search:focus { border-color: var(--sky); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-5); }
+.kpi-card { padding: var(--space-4); border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); text-align: center; }
+.kpi-value { font-size: var(--text-2xl); font-weight: 800; font-family: var(--font-mono); }
+.kpi-label { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+
+table.comp-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.comp-table th { text-align: left; padding: var(--space-2) var(--space-3); font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid var(--border); background: var(--surface-2); cursor: pointer; }
+.comp-table th:hover { color: var(--text); }
+.comp-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-soft); color: var(--text-2); vertical-align: top; }
+.comp-table tr:hover td { background: var(--surface); }
+.comp-table tr.expand-row td { padding: 0; }
+.comp-table tr.expand-row .detail-inner { padding: var(--space-3) var(--space-4); background: var(--surface-2); border-left: 3px solid var(--sky); }
+.comp-id { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-xs); }
+.comp-title { font-weight: 600; }
+.comp-type { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--surface-2); color: var(--text-2); display: inline-block; }
+.tpl-tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(14,165,233,.1); color: var(--sky); font-weight: 600; margin-right: 3px; }
+.res-count { font-family: var(--font-mono); font-weight: 700; }
+.detail-cause { font-size: var(--text-xs); color: var(--muted); margin-top: var(--space-2); }
+.detail-res-list { margin-top: var(--space-2); }
+.detail-res-list li { font-size: 11px; padding: 1px 0; }
+.detail-res-type { font-weight: 700; font-size: 11px; color: var(--text); margin-top: var(--space-2); }
+
+.pager { display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); }
+.pager button { padding: var(--space-1) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: var(--text-sm); cursor: pointer; }
+.pager button:hover { border-color: var(--sky); }
+.pager button:disabled { opacity: .4; cursor: default; }
+.pager .pager-info { font-size: var(--text-xs); color: var(--muted); }
+
+.export-wrap { position: relative; }
+.btn-export { padding: var(--space-2) var(--space-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); font-weight: 600; font-size: var(--text-sm); cursor: pointer; }
+.btn-export:hover { border-color: var(--sky); }
+.export-dropdown { position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xl); z-index: 50; min-width: 180px; display: none; }
+.export-dropdown.open { display: block; }
+.export-dropdown button { display: block; width: 100%; padding: var(--space-2) var(--space-3); background: none; border: none; text-align: left; color: var(--text-2); font-size: var(--text-sm); cursor: pointer; }
+.export-dropdown button:hover { background: var(--surface-2); color: var(--text); }
+</style>
+</head>
+<body>
+<nav class="s-nav">
+  <a href="/" class="nav-brand"><div class="nav-logo">☁</div><span class="nav-name">Prisma Cloud</span></a>
+  <a href="/" class="nav-link">Dashboard</a>
+
+  <a href="/explorer.html" class="nav-link">Explorer</a>
+  <a href="/schedules.html" class="nav-link">Schedules</a>
+  <a href="/settings.html" class="nav-link">Settings</a>
+  <div class="nav-spacer"></div>
+  <span id="theme-slot"></span>
+  <div id="tenant-slot"></div>
+</nav>
+
+<div class="s-main">
+  <div class="page-header">
+    <h1 class="page-title">Compliance Report</h1>
+    <p class="page-subtitle">Compliance findings across hosts, images, and registry — grouped by check ID</p>
+  </div>
+
+  <div id="kpi-row" class="kpi-row"></div>
+
+  <div class="comp-toolbar">
+    <input type="text" id="search" class="comp-search" placeholder="Search by title, ID, or description…" onkeyup="if(event.key==='Enter')applyFilters()">
+    <select class="select" id="filter-sev" onchange="applyFilters()">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select class="select" id="filter-type" onchange="applyFilters()"></select>
+    <select class="select" id="filter-template" onchange="applyFilters()"></select>
+    <select class="select" id="filter-rt" onchange="applyFilters()"></select>
+    <select class="select" id="filter-collection" onchange="applyFilters()"></select>
+    <div style="flex:1"></div>
+    <div class="export-wrap">
+      <button class="btn-export" onclick="toggleExportMenu()">Export ▾</button>
+      <div class="export-dropdown" id="export-dropdown">
+        <button onclick="doExport('csv')">CSV Spreadsheet</button>
+        <button onclick="doExport('html')">HTML Report</button>
+        <button onclick="doExport('pdf')">PDF Document</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="table-wrap"></div>
+  <div id="pager" class="pager"></div>
+</div>
+
+<script src="tenant.js"></script>
+<script src="compliance.js"></script>
+</body>
+</html>
