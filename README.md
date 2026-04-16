@@ -59,7 +59,9 @@ The file is a JSON array. Each object represents one Prisma Cloud tenant.
     "identity": "your-access-key-id",
     "secret": "your-secret-key",
     "url": "https://api.prismacloud.io",
-    "verify": true
+    "verify": "true",
+    "proxies": null,
+    "project_flag": "false"
   }
 ]
 ```
@@ -73,14 +75,18 @@ The file is a JSON array. Each object represents one Prisma Cloud tenant.
     "identity": "access-key-for-tenant-1",
     "secret": "secret-key-for-tenant-1",
     "url": "https://api.prismacloud.io",
-    "verify": true
+    "verify": "true",
+    "proxies": null,
+    "project_flag": "false"
   },
   {
     "name": "Staging Self-Hosted",
     "identity": "access-key-for-tenant-2",
     "secret": "secret-key-for-tenant-2",
     "url": "https://api2.prismacloud.io",
-    "verify": true
+    "verify": "true",
+    "proxies": null,
+    "project_flag": "false"
   }
 ]
 ```
