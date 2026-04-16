@@ -45,7 +45,7 @@ mkdir -p ~/.prismacloud
 Then create the file with your editor of choice (e.g. `vi`, `nano`, `code`):
 
 ```bash
-nano ~/.prismacloud/credentials.json
+vi ~/.prismacloud/credentials.json
 ```
 
 The file is a JSON array. Each object represents one Prisma Cloud tenant.
