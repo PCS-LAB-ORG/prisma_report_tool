@@ -142,9 +142,10 @@ function ensureReportingTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cve_id TEXT NOT NULL, scan_id INTEGER NOT NULL, repo TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS cve_collections (
+    CREATE TABLE IF NOT EXISTS resource_collections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cve_id TEXT NOT NULL, scan_id INTEGER NOT NULL, collection TEXT NOT NULL
+      resource_name TEXT NOT NULL, resource_type TEXT NOT NULL,
+      scan_id INTEGER NOT NULL, collection TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS compliance_issues (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,6 +163,8 @@ function ensureReportingTables() {
     CREATE INDEX IF NOT EXISTS idx_compres_scan ON compliance_resources(comp_id, scan_id);
     CREATE INDEX IF NOT EXISTS idx_compres_resname ON compliance_resources(resource_name, scan_id);
     CREATE INDEX IF NOT EXISTS idx_cveres_resname ON cve_resources(resource_name, scan_id);
+    CREATE INDEX IF NOT EXISTS idx_rescol_res ON resource_collections(resource_name, scan_id);
+    CREATE INDEX IF NOT EXISTS idx_rescol_col ON resource_collections(collection, scan_id);
     CREATE TABLE IF NOT EXISTS report_templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       config TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')),
@@ -321,7 +324,7 @@ app.delete('/api/scans/:id', (req, res) => {
     rw.prepare('DELETE FROM cve_risk_factors WHERE scan_id = ?').run(scanId);
     rw.prepare('DELETE FROM cve_os_labels WHERE scan_id = ?').run(scanId);
     rw.prepare('DELETE FROM cve_repos WHERE scan_id = ?').run(scanId);
-    rw.prepare('DELETE FROM cve_collections WHERE scan_id = ?').run(scanId);
+    rw.prepare('DELETE FROM resource_collections WHERE scan_id = ?').run(scanId);
     rw.prepare('DELETE FROM compliance_issues WHERE scan_id = ?').run(scanId);
     rw.prepare('DELETE FROM compliance_resources WHERE scan_id = ?').run(scanId);
     rw.prepare('DELETE FROM scan_snapshots WHERE scan_id = ?').run(scanId);
@@ -353,7 +356,7 @@ app.get('/api/filters', (req, res) => {
   const os = [...new Set(conn.prepare('SELECT DISTINCT os_label FROM cve_os_labels WHERE scan_id = ? ORDER BY os_label').all(scanId).map(r => normalizeOs(r.os_label)))].sort();
   const rf = conn.prepare('SELECT DISTINCT risk_factor FROM cve_risk_factors WHERE scan_id = ? ORDER BY risk_factor').all(scanId).map(r => r.risk_factor);
   const repos = conn.prepare('SELECT DISTINCT repo FROM cve_repos WHERE scan_id = ? ORDER BY repo').all(scanId).map(r => r.repo);
-  const collections = conn.prepare('SELECT DISTINCT collection FROM cve_collections WHERE scan_id = ? ORDER BY collection').all(scanId).map(r => r.collection);
+  const collections = conn.prepare('SELECT DISTINCT collection FROM resource_collections WHERE scan_id = ? ORDER BY collection').all(scanId).map(r => r.collection);
   const resourceTypes = conn.prepare('SELECT DISTINCT resource_type FROM cve_resources WHERE scan_id = ? ORDER BY resource_type').all(scanId).map(r => r.resource_type);
   res.json({ os, risk_factors: rf, repos, collections, resource_types: resourceTypes });
 });
@@ -412,9 +415,9 @@ app.get('/api/kev', (req, res) => {
   const repoFilter = req.query.repo || null;
   let cveIds;
   if (colFilter && repoFilter) {
-    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_collections co ON co.cve_id=c.cve_id AND co.scan_id=c.scan_id JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND co.collection=? AND r.repo=?').all(scanId, colFilter, repoFilter).map(r => r.cve_id);
+    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_resources cvr ON cvr.cve_id=c.cve_id AND cvr.scan_id=c.scan_id JOIN resource_collections rc ON rc.resource_name=cvr.resource_name AND rc.scan_id=cvr.scan_id JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND rc.collection=? AND r.repo=?').all(scanId, colFilter, repoFilter).map(r => r.cve_id);
   } else if (colFilter) {
-    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_collections co ON co.cve_id=c.cve_id AND co.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND co.collection=?').all(scanId, colFilter).map(r => r.cve_id);
+    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_resources cvr ON cvr.cve_id=c.cve_id AND cvr.scan_id=c.scan_id JOIN resource_collections rc ON rc.resource_name=cvr.resource_name AND rc.scan_id=cvr.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND rc.collection=?').all(scanId, colFilter).map(r => r.cve_id);
   } else if (repoFilter) {
     cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND r.repo=?').all(scanId, repoFilter).map(r => r.cve_id);
   } else { cveIds = null; }
@@ -490,9 +493,9 @@ app.post('/api/kev/export', async (req, res) => {
 
   let cveIds;
   if (collection && repo) {
-    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_collections co ON co.cve_id=c.cve_id AND co.scan_id=c.scan_id JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND co.collection=? AND r.repo=?').all(scanId, collection, repo).map(r => r.cve_id);
+    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_resources cvr ON cvr.cve_id=c.cve_id AND cvr.scan_id=c.scan_id JOIN resource_collections rc ON rc.resource_name=cvr.resource_name AND rc.scan_id=cvr.scan_id JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND rc.collection=? AND r.repo=?').all(scanId, collection, repo).map(r => r.cve_id);
   } else if (collection) {
-    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_collections co ON co.cve_id=c.cve_id AND co.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND co.collection=?').all(scanId, collection).map(r => r.cve_id);
+    cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_resources cvr ON cvr.cve_id=c.cve_id AND cvr.scan_id=c.scan_id JOIN resource_collections rc ON rc.resource_name=cvr.resource_name AND rc.scan_id=cvr.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND rc.collection=?').all(scanId, collection).map(r => r.cve_id);
   } else if (repo) {
     cveIds = conn.prepare('SELECT DISTINCT c.cve_id FROM cves c JOIN cve_repos r ON r.cve_id=c.cve_id AND r.scan_id=c.scan_id WHERE c.scan_id=? AND c.is_kev=1 AND r.repo=?').all(scanId, repo).map(r => r.cve_id);
   } else { cveIds = null; }
@@ -536,7 +539,7 @@ function enrichCve(conn, cve, scanId, includeRepos) {
   const enriched = { cve_id: cve.cve_id, severity: cve.severity, description: cve.description, link: cve.link, cvss: cve.cvss, fix_status: cve.fix_status, is_kev: cve.is_kev, packages: pkgMap, resources: resMap, risk_factors: riskFactors, os_labels: osLabels };
   if (includeRepos) {
     enriched.repos = conn.prepare('SELECT DISTINCT repo FROM cve_repos WHERE cve_id=? AND scan_id=?').all(cve.cve_id, scanId).map(r => r.repo);
-    enriched.collections = conn.prepare('SELECT DISTINCT collection FROM cve_collections WHERE cve_id=? AND scan_id=?').all(cve.cve_id, scanId).map(r => r.collection);
+    enriched.collections = conn.prepare('SELECT DISTINCT rc.collection FROM resource_collections rc JOIN cve_resources cvr ON cvr.resource_name=rc.resource_name AND cvr.scan_id=rc.scan_id WHERE cvr.cve_id=? AND cvr.scan_id=?').all(cve.cve_id, scanId).map(r => r.collection);
   }
   return enriched;
 }
@@ -820,7 +823,7 @@ function executeReportQuery(config, conn) {
     if (resolved.length) { joins += ' JOIN cve_os_labels ol ON ol.cve_id=c.cve_id AND ol.scan_id=c.scan_id'; where.push('ol.os_label IN (' + resolved.map(()=>'?').join(',') + ')'); params.push(...resolved); }
   }
   if (filters.risk_factor && filters.risk_factor.length) { joins += ' JOIN cve_risk_factors rf ON rf.cve_id=c.cve_id AND rf.scan_id=c.scan_id'; where.push('rf.risk_factor IN (' + filters.risk_factor.map(()=>'?').join(',') + ')'); params.push(...filters.risk_factor); }
-  if (filters.collection && filters.collection.length) { joins += ' JOIN cve_collections cc ON cc.cve_id=c.cve_id AND cc.scan_id=c.scan_id'; where.push('cc.collection IN (' + filters.collection.map(()=>'?').join(',') + ')'); params.push(...filters.collection); }
+  if (filters.collection && filters.collection.length) { joins += ' JOIN cve_resources ccr ON ccr.cve_id=c.cve_id AND ccr.scan_id=c.scan_id JOIN resource_collections rcc ON rcc.resource_name=ccr.resource_name AND rcc.scan_id=ccr.scan_id'; where.push('rcc.collection IN (' + filters.collection.map(()=>'?').join(',') + ')'); params.push(...filters.collection); }
   if (filters.repo && filters.repo.length) { joins += ' JOIN cve_repos cr ON cr.cve_id=c.cve_id AND cr.scan_id=c.scan_id'; where.push('cr.repo IN (' + filters.repo.map(()=>'?').join(',') + ')'); params.push(...filters.repo); }
   if (filters.resource_type && filters.resource_type.length) { joins += ' JOIN cve_resources rt ON rt.cve_id=c.cve_id AND rt.scan_id=c.scan_id'; where.push('rt.resource_type IN (' + filters.resource_type.map(()=>'?').join(',') + ')'); params.push(...filters.resource_type); }
   const allowed = ['cvss','cve_id','severity','fix_status'];
@@ -1269,7 +1272,7 @@ app.get('/api/compliance', (req, res) => {
   if (resourceType) { joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id'; where += ' AND cr.resource_type=?'; params.push(resourceType); }
   if (collection) {
     const resNames = conn.prepare(
-      'SELECT DISTINCT cvr.resource_name FROM cve_resources cvr JOIN cve_collections cc ON cc.cve_id=cvr.cve_id AND cc.scan_id=cvr.scan_id WHERE cvr.scan_id=? AND cc.collection=?'
+      'SELECT DISTINCT rc.resource_name FROM resource_collections rc WHERE rc.scan_id=? AND rc.collection=?'
     ).all(scanId, collection).map(r => r.resource_name);
     if (resNames.length) {
       if (!joins.includes('compliance_resources cr')) joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id';
@@ -1343,7 +1346,7 @@ app.get('/api/compliance/summary', (req, res) => {
   if (resourceType) { joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id'; where += ' AND cr.resource_type=?'; params.push(resourceType); }
   if (collection) {
     const resNames = conn.prepare(
-      'SELECT DISTINCT cvr.resource_name FROM cve_resources cvr JOIN cve_collections cc ON cc.cve_id=cvr.cve_id AND cc.scan_id=cvr.scan_id WHERE cvr.scan_id=? AND cc.collection=?'
+      'SELECT DISTINCT rc.resource_name FROM resource_collections rc WHERE rc.scan_id=? AND rc.collection=?'
     ).all(scanId, collection).map(r => r.resource_name);
     if (resNames.length) {
       if (!joins.includes('compliance_resources cr')) joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id';
@@ -1354,7 +1357,7 @@ app.get('/api/compliance/summary', (req, res) => {
       const tplSet = new Set();
       for (const r of conn.prepare("SELECT templates FROM compliance_issues WHERE scan_id=? AND templates != '[]'").all(scanId)) { try { for (const t of JSON.parse(r.templates)) tplSet.add(t); } catch (_) {} }
       const resourceTypes = conn.prepare('SELECT DISTINCT resource_type FROM compliance_resources WHERE scan_id=? ORDER BY resource_type').all(scanId).map(r => r.resource_type);
-      const collections = conn.prepare('SELECT DISTINCT cc.collection FROM cve_collections cc WHERE cc.scan_id=? ORDER BY cc.collection').all(scanId).map(r => r.collection);
+      const collections = conn.prepare('SELECT DISTINCT rc.collection FROM resource_collections rc WHERE rc.scan_id=? ORDER BY rc.collection').all(scanId).map(r => r.collection);
       return res.json({ total: 0, critical: 0, high: 0, medium: 0, low: 0, types, templates: [...tplSet].sort(), resource_types: resourceTypes, resource_count: 0, collections });
     }
   }
@@ -1377,7 +1380,7 @@ app.get('/api/compliance/summary', (req, res) => {
   }
   const resourceTypes = conn.prepare('SELECT DISTINCT resource_type FROM compliance_resources WHERE scan_id=? ORDER BY resource_type').all(scanId).map(r => r.resource_type);
 
-  const collections = conn.prepare('SELECT DISTINCT cc.collection FROM cve_collections cc WHERE cc.scan_id=? ORDER BY cc.collection').all(scanId).map(r => r.collection);
+  const collections = conn.prepare('SELECT DISTINCT rc.collection FROM resource_collections rc WHERE rc.scan_id=? ORDER BY rc.collection').all(scanId).map(r => r.collection);
 
   res.json({
     total,
@@ -1420,7 +1423,7 @@ app.post('/api/compliance/export', async (req, res) => {
   if (resourceType) { joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id'; where += ' AND cr.resource_type=?'; params.push(resourceType); }
   if (collection) {
     const resNames = conn.prepare(
-      'SELECT DISTINCT cvr.resource_name FROM cve_resources cvr JOIN cve_collections cc ON cc.cve_id=cvr.cve_id AND cc.scan_id=cvr.scan_id WHERE cvr.scan_id=? AND cc.collection=?'
+      'SELECT DISTINCT rc.resource_name FROM resource_collections rc WHERE rc.scan_id=? AND rc.collection=?'
     ).all(scanId, collection).map(r => r.resource_name);
     if (resNames.length) {
       if (!joins.includes('compliance_resources cr')) joins += ' JOIN compliance_resources cr ON cr.comp_id=ci.comp_id AND cr.scan_id=ci.scan_id';
@@ -2181,7 +2184,7 @@ app.get('/api/explorer', (req, res) => {
     if (resolved.length) { joins += ' JOIN cve_os_labels ol ON ol.cve_id=c.cve_id AND ol.scan_id=c.scan_id'; where.push('ol.os_label IN (' + resolved.map(()=>'?').join(',') + ')'); params.push(...resolved); }
   }
   if (filters.risk_factor && filters.risk_factor.length) { joins += ' JOIN cve_risk_factors rf ON rf.cve_id=c.cve_id AND rf.scan_id=c.scan_id'; where.push('rf.risk_factor IN (' + filters.risk_factor.map(()=>'?').join(',') + ')'); params.push(...filters.risk_factor); }
-  if (filters.collection && filters.collection.length) { joins += ' JOIN cve_collections cc ON cc.cve_id=c.cve_id AND cc.scan_id=c.scan_id'; where.push('cc.collection IN (' + filters.collection.map(()=>'?').join(',') + ')'); params.push(...filters.collection); }
+  if (filters.collection && filters.collection.length) { joins += ' JOIN cve_resources ccr2 ON ccr2.cve_id=c.cve_id AND ccr2.scan_id=c.scan_id JOIN resource_collections rcc2 ON rcc2.resource_name=ccr2.resource_name AND rcc2.scan_id=ccr2.scan_id'; where.push('rcc2.collection IN (' + filters.collection.map(()=>'?').join(',') + ')'); params.push(...filters.collection); }
   if (filters.repo && filters.repo.length) { joins += ' JOIN cve_repos cr ON cr.cve_id=c.cve_id AND cr.scan_id=c.scan_id'; where.push('cr.repo IN (' + filters.repo.map(()=>'?').join(',') + ')'); params.push(...filters.repo); }
   if (filters.resource_type && filters.resource_type.length) { joins += ' JOIN cve_resources rtr ON rtr.cve_id=c.cve_id AND rtr.scan_id=c.scan_id'; where.push('rtr.resource_type IN (' + filters.resource_type.map(()=>'?').join(',') + ')'); params.push(...filters.resource_type); }
   if (search) {

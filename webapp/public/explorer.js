@@ -234,10 +234,26 @@ function toggleSection(headEl) {
 function buildChecks(containerId, items, filterKey) {
   const el = document.getElementById(containerId);
   if (!items || !items.length) { el.innerHTML = '<span style="color:var(--muted);font-size:10px">None available</span>'; return; }
-  el.innerHTML = items.map(v =>
-    '<label class="filter-check"><input type="checkbox" value="' + esc(v) + '" data-filter="' + filterKey + '"> ' + esc(v) + '</label>'
+  let html = '';
+  if (items.length > 5) {
+    html += '<input type="text" class="filter-search" placeholder="Filter…" data-target="' + containerId + '" oninput="filterCheckboxes(this)">';
+  }
+  html += '<div class="filter-checks-list" id="' + containerId + '-list">';
+  html += items.map(v =>
+    '<label class="filter-check" data-val="' + esc(v).toLowerCase() + '"><input type="checkbox" value="' + esc(v) + '" data-filter="' + filterKey + '"> ' + esc(v) + '</label>'
   ).join('');
-  el.querySelectorAll('input').forEach(inp => inp.addEventListener('change', onFilterChange));
+  html += '</div>';
+  el.innerHTML = html;
+  el.querySelectorAll('input[type=checkbox]').forEach(inp => inp.addEventListener('change', onFilterChange));
+}
+
+function filterCheckboxes(input) {
+  const q = input.value.toLowerCase();
+  const list = input.nextElementSibling;
+  list.querySelectorAll('.filter-check').forEach(label => {
+    const val = label.dataset.val || '';
+    label.style.display = val.includes(q) ? '' : 'none';
+  });
 }
 
 function onFilterChange() {
@@ -262,6 +278,10 @@ function clearAllFilters() {
   document.getElementById('f-kev').checked = false;
   document.getElementById('search-input').value = '';
   document.getElementById('group-by-select').value = '';
+  document.querySelectorAll('#sidebar .filter-search').forEach(inp => {
+    inp.value = '';
+    filterCheckboxes(inp);
+  });
   state.q = '';
   state.groupBy = '';
   state.collapsedGroups = {};
@@ -532,11 +552,14 @@ function goPage(n) {
 
 /* ── Data fetching ────────────────────────────────────── */
 
-let loadTimer = null;
-function scheduleLoad() {
-  clearTimeout(loadTimer);
-  loadTimer = setTimeout(() => { state.page = 1; renderActiveFilters(); loadData(); }, 300);
+function doSearch() {
+  state.q = document.getElementById('search-input').value;
+  state.page = 1;
+  renderActiveFilters();
+  loadData();
 }
+
+let loadTimer = null;
 
 async function loadData() {
   const f = F();
@@ -645,9 +668,9 @@ async function doExport(format) {
 /* ── Init ────────────────────────────────────────────── */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('search-input').addEventListener('input', (e) => {
-    state.q = e.target.value;
-    scheduleLoad();
+  const searchInput = document.getElementById('search-input');
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { doSearch(); }
   });
 
   renderColPicker();
@@ -665,6 +688,7 @@ if (window.TenantCtx) {
       state.filters = {};
       state.q = '';
       document.querySelectorAll('#sidebar input:checked').forEach(i => { i.checked = false; });
+      document.querySelectorAll('#sidebar .filter-search').forEach(i => { i.value = ''; });
       document.getElementById('search-input').value = '';
       loadFilterOptions().then(() => { renderActiveFilters(); loadData(); });
     };

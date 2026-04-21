@@ -45,7 +45,7 @@ mkdir -p ~/.prismacloud
 Then create the file with your editor of choice (e.g. `vi`, `nano`, `code`):
 
 ```bash
-vi ~/.prismacloud/credentials.json
+nano ~/.prismacloud/credentials.json
 ```
 
 The file is a JSON array. Each object represents one Prisma Cloud tenant.
@@ -59,9 +59,7 @@ The file is a JSON array. Each object represents one Prisma Cloud tenant.
     "identity": "your-access-key-id",
     "secret": "your-secret-key",
     "url": "https://api.prismacloud.io",
-    "verify": "true",
-    "proxies": null,
-    "project_flag": "false"
+    "verify": true
   }
 ]
 ```
@@ -75,18 +73,14 @@ The file is a JSON array. Each object represents one Prisma Cloud tenant.
     "identity": "access-key-for-tenant-1",
     "secret": "secret-key-for-tenant-1",
     "url": "https://api.prismacloud.io",
-    "verify": "true",
-    "proxies": null,
-    "project_flag": "false"
+    "verify": true
   },
   {
     "name": "Staging Self-Hosted",
     "identity": "access-key-for-tenant-2",
     "secret": "secret-key-for-tenant-2",
     "url": "https://api2.prismacloud.io",
-    "verify": "true",
-    "proxies": null,
-    "project_flag": "false"
+    "verify": true
   }
 ]
 ```

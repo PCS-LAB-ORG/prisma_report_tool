@@ -193,7 +193,8 @@ def extract_namespaces(resource):
 
 
 def extract_collections(resource):
-    return set(resource.get("collections", []) or [])
+    raw = resource.get("collections", []) or []
+    return {c for c in raw if "Access Group (RBAC)" not in c}
 
 
 def extract_repos(resource):
@@ -217,12 +218,18 @@ def extract_risk_factors(vuln):
     return rfs
 
 
-def process_resource(resource, rtype, cve_map, comp_map=None):
+def process_resource(resource, rtype, cve_map, comp_map=None, res_collections=None):
     resource_name = extract_resource_name(resource, rtype)
     os_label = extract_distro(resource)
     namespaces = extract_namespaces(resource)
     collections = extract_collections(resource)
     repos = extract_repos(resource)
+
+    if res_collections is not None and collections:
+        key = (resource_name, rtype)
+        if key not in res_collections:
+            res_collections[key] = set()
+        res_collections[key].update(collections)
 
     vulns = resource.get("vulnerabilities") or []
     for v in vulns:
@@ -257,7 +264,6 @@ def process_resource(resource, rtype, cve_map, comp_map=None):
                 "os_labels": set(),
                 "risk_factors": set(),
                 "repos": set(),
-                "collections": set(),
             }
 
         entry = cve_map[cve_id]
@@ -282,7 +288,6 @@ def process_resource(resource, rtype, cve_map, comp_map=None):
         entry["os_labels"].add(os_label)
         entry["risk_factors"].update(risk_factors)
         entry["repos"].update(repos)
-        entry["collections"].update(collections)
 
     if comp_map is not None:
         for ci in resource.get("complianceIssues") or []:
@@ -382,9 +387,10 @@ CREATE TABLE IF NOT EXISTS cve_repos (
     FOREIGN KEY (scan_id) REFERENCES scan_runs(id)
 );
 
-CREATE TABLE IF NOT EXISTS cve_collections (
+CREATE TABLE IF NOT EXISTS resource_collections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cve_id TEXT NOT NULL,
+    resource_name TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
     scan_id INTEGER NOT NULL,
     collection TEXT NOT NULL,
     FOREIGN KEY (scan_id) REFERENCES scan_runs(id)
@@ -398,7 +404,8 @@ CREATE INDEX IF NOT EXISTS idx_ns_res ON cve_resource_namespaces(resource_id);
 CREATE INDEX IF NOT EXISTS idx_rf_cve ON cve_risk_factors(cve_id, scan_id);
 CREATE INDEX IF NOT EXISTS idx_os_cve ON cve_os_labels(cve_id, scan_id);
 CREATE INDEX IF NOT EXISTS idx_repo_cve ON cve_repos(cve_id, scan_id);
-CREATE INDEX IF NOT EXISTS idx_col_cve ON cve_collections(cve_id, scan_id);
+CREATE INDEX IF NOT EXISTS idx_rescol_res ON resource_collections(resource_name, scan_id);
+CREATE INDEX IF NOT EXISTS idx_rescol_col ON resource_collections(collection, scan_id);
 
 CREATE TABLE IF NOT EXISTS compliance_issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -457,7 +464,7 @@ CREATE TABLE IF NOT EXISTS scan_diffs (
 """
 
 
-def write_to_sqlite(db_path, cve_map, comp_map=None):
+def write_to_sqlite(db_path, cve_map, comp_map=None, res_collections=None):
     print(f"\nWriting to {db_path} ...")
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
@@ -504,7 +511,6 @@ def write_to_sqlite(db_path, cve_map, comp_map=None):
     rf_rows = []
     os_rows = []
     repo_rows = []
-    col_rows = []
 
     for cve_id, data in cve_map.items():
         cve_rows.append((
@@ -536,9 +542,6 @@ def write_to_sqlite(db_path, cve_map, comp_map=None):
 
         for repo in data.get("repos", set()):
             repo_rows.append((cve_id, scan_id, repo))
-
-        for col in data.get("collections", set()):
-            col_rows.append((cve_id, scan_id, col))
 
     print(f"  CVEs: {len(cve_rows)}")
     cur.executemany(
@@ -586,9 +589,14 @@ def write_to_sqlite(db_path, cve_map, comp_map=None):
         repo_rows,
     )
 
-    print(f"  Collections: {len(col_rows)}")
+    col_rows = []
+    if res_collections:
+        for (rname, rtype), cols in res_collections.items():
+            for col in cols:
+                col_rows.append((rname, rtype, scan_id, col))
+    print(f"  Resource collections: {len(col_rows)}")
     cur.executemany(
-        "INSERT INTO cve_collections (cve_id,scan_id,collection) VALUES (?,?,?)",
+        "INSERT INTO resource_collections (resource_name,resource_type,scan_id,collection) VALUES (?,?,?,?)",
         col_rows,
     )
 
@@ -789,7 +797,7 @@ def purge_old_scans(db_path, keep=2):
         cur.execute("DELETE FROM cve_risk_factors WHERE scan_id=?", (sid,))
         cur.execute("DELETE FROM cve_os_labels WHERE scan_id=?", (sid,))
         cur.execute("DELETE FROM cve_repos WHERE scan_id=?", (sid,))
-        cur.execute("DELETE FROM cve_collections WHERE scan_id=?", (sid,))
+        cur.execute("DELETE FROM resource_collections WHERE scan_id=?", (sid,))
         cur.execute("DELETE FROM compliance_issues WHERE scan_id=?", (sid,))
         cur.execute("DELETE FROM compliance_resources WHERE scan_id=?", (sid,))
     conn.commit()
@@ -802,9 +810,10 @@ def purge_old_scans(db_path, keep=2):
 # ── Main ──────────────────────────────────────────────────────
 
 def fetch_tenant_data(session, json_cache=None):
-    """Fetch vuln data for a single tenant session. Returns (cve_map, comp_map)."""
+    """Fetch vuln data for a single tenant session. Returns (cve_map, comp_map, res_collections)."""
     cve_map = {}
     comp_map = {}
+    res_collections = {}
 
     if json_cache and os.path.exists(json_cache):
         try:
@@ -814,8 +823,8 @@ def fetch_tenant_data(session, json_cache=None):
             for rtype, resources in cached.items():
                 print(f"    Processing {len(resources)} {rtype} resources ...")
                 for res in resources:
-                    process_resource(res, rtype, cve_map, comp_map)
-            return cve_map, comp_map
+                    process_resource(res, rtype, cve_map, comp_map, res_collections)
+            return cve_map, comp_map, res_collections
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"  Cache load error: {e}")
 
@@ -825,14 +834,14 @@ def fetch_tenant_data(session, json_cache=None):
         resources = fetch_all_pages(session, endpoint)
         raw_data[rtype] = resources
         for res in resources:
-            process_resource(res, rtype, cve_map, comp_map)
+            process_resource(res, rtype, cve_map, comp_map, res_collections)
 
     if json_cache:
         with open(json_cache, "w") as f:
             json.dump(raw_data, f, default=str)
         print(f"  Cached raw data to {json_cache}")
 
-    return cve_map, comp_map
+    return cve_map, comp_map, res_collections
 
 
 def main():
@@ -870,20 +879,20 @@ def main():
         print(f"{'='*60}")
 
         if use_cache:
-            cve_map, comp_map = fetch_tenant_data(None, json_cache=args.json_cache)
+            cve_map, comp_map, res_collections = fetch_tenant_data(None, json_cache=args.json_cache)
         else:
             session = get_session_for_tenant(managers, cred_idx)
             if session is None:
                 print(f"  SKIPPING — no credential at index {cred_idx}\n")
                 continue
-            cve_map, comp_map = fetch_tenant_data(session)
+            cve_map, comp_map, res_collections = fetch_tenant_data(session)
 
         print(f"\n  Processed {len(cve_map):,} unique CVEs, {len(comp_map):,} compliance issues")
         for s in SEVERITY_ORDER:
             count = sum(1 for d in cve_map.values() if d["severity"] == s)
             print(f"    {s.capitalize():>8}: {count:,}")
 
-        scan_id, db_path = write_to_sqlite(db_file, cve_map, comp_map)
+        scan_id, db_path = write_to_sqlite(db_file, cve_map, comp_map, res_collections)
         compute_snapshot(db_path, scan_id)
         compute_diff(db_path, scan_id)
         purge_old_scans(db_path)

@@ -19,14 +19,19 @@
 .ex-sidebar .card-body.is-collapsed { display: none; }
 .filter-check { display: flex; align-items: center; gap: var(--space-2); padding: 2px 0; font-size: var(--text-xs); color: var(--text-2); cursor: pointer; }
 .filter-check input { accent-color: var(--sky); }
+.filter-search { display: block; width: 100%; padding: 4px 8px; margin-bottom: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 10px; outline: none; transition: border-color var(--t-base); box-sizing: border-box; }
+.filter-search:focus { border-color: var(--sky); }
+.filter-search::placeholder { color: var(--placeholder); }
 
 /* Toolbar */
 .ex-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-2); }
-.search-box { flex: 1; min-width: 200px; position: relative; }
-.search-box input { width: 100%; padding: var(--space-2) var(--space-3); padding-left: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: var(--text-sm); outline: none; transition: border-color var(--t-base); }
+.search-box { flex: 1; min-width: 200px; position: relative; display: flex; gap: 0; }
+.search-box input { flex: 1; min-width: 0; padding: var(--space-2) var(--space-3); padding-left: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) 0 0 var(--radius); color: var(--text); font-size: var(--text-sm); outline: none; transition: border-color var(--t-base); }
 .search-box input:focus { border-color: var(--sky); }
 .search-box input::placeholder { color: var(--placeholder); }
-.search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); }
+.search-box svg.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); pointer-events: none; }
+.search-btn { padding: var(--space-2) var(--space-3); background: var(--sky); color: #fff; border: 1px solid var(--sky); border-left: none; border-radius: 0 var(--radius) var(--radius) 0; font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background var(--t-base); }
+.search-btn:hover { background: var(--sky-dark); }
 
 /* Export dropdown */
 .export-wrap { position: relative; }
@@ -240,8 +245,9 @@
     <div class="ex-main">
       <div class="ex-toolbar">
         <div class="search-box">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+          <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
           <input type="text" id="search-input" placeholder="Search CVE ID, description, package, resource name…">
+          <button class="search-btn" id="search-btn" onclick="doSearch()">Search</button>
         </div>
         <div class="col-picker-wrap">
           <button class="col-picker-trigger" onclick="toggleColumnPicker()">
